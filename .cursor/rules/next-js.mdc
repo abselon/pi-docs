@@ -1,0 +1,18 @@
+# Next.js Static Site Rules
+
+## Configuration
+- Next.js app is located in `apps/web/`
+- Configured for static export (`output: 'export'`)
+- TypeScript enabled
+
+## Development Guidelines
+- Use App Router (app directory) for routing
+- Follow Next.js best practices for static site generation
+- Optimize images using Next.js Image component
+- Use environment variables for configuration
+
+## Build and Deployment
+- Static export generates files in `apps/web/out/`
+- Ensure all routes are statically generated where possible
+- Test static export locally before deployment
+- Document any dynamic features that require runtime configuration

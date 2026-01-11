@@ -1,0 +1,18 @@
+# Infrastructure Deployment Rules
+
+## AWS CDK Setup
+- Infrastructure code is located in `infrastructure/`
+- Use TypeScript for CDK code
+- Follow AWS best practices for resource naming and organization
+
+## Deployment Guidelines
+- Always test infrastructure changes in a development environment first
+- Use environment-specific configurations (dev, staging, prod)
+- Document all infrastructure changes in `docs/technical/`
+- Ensure proper IAM roles and permissions are configured
+
+## Resource Management
+- Use CDK constructs for common patterns
+- Tag all resources appropriately
+- Follow least-privilege principle for IAM policies
+- Document resource dependencies and relationships

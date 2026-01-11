@@ -1,0 +1,1571 @@
+openapi: 3.0.3
+info:
+  title: Pi Docs API
+  description: |
+    # Pi Docs REST API
+    
+    Complete REST API for Pi Docs - A secure document management system.
+    
+    This API can be used by:
+    - Web frontends (React, Vue, Angular, etc.)
+    - Mobile applications (React Native, Flutter, Native iOS/Android)
+    - Third-party integrations
+    - CLI tools and scripts
+    
+    ## Authentication
+    
+    The API uses **Bearer Token (JWT)** authentication. 
+    
+    ### Getting a Token
+    
+    1. Register a new account: `POST /auth/register`
+    2. Or login: `POST /auth/login`
+    3. Use the returned `token` in the Authorization header:
+    
+    ```
+    Authorization: Bearer <your-jwt-token>
+    ```
+    
+    **Token Expiration**: 7 days
+    
+    ### Example
+    
+    ```bash
+    curl -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
+      https://api.yourdomain.com/api/documents
+    ```
+    
+    ## Base URLs
+    
+    - **Production**: `https://api.yourdomain.com/api`
+    - **Development**: `http://localhost:3001/api`
+    
+    ## Rate Limiting
+    
+    Currently, the API does not enforce rate limiting. However, it's recommended to:
+    - Implement client-side rate limiting
+    - Cache responses when appropriate
+    - Batch requests when possible
+    
+    Rate limiting may be added in future versions.
+    
+    ## Error Handling
+    
+    All errors follow this format:
+    
+    ```json
+    {
+      "error": {
+        "code": "ERROR_CODE",
+        "message": "Human-readable error message",
+        "details": {}
+      }
+    }
+    ```
+    
+    Common HTTP status codes:
+    - `200` - Success
+    - `201` - Created
+    - `204` - No Content (deleted)
+    - `400` - Bad Request (validation error)
+    - `401` - Unauthorized (invalid/missing token)
+    - `404` - Not Found
+    - `409` - Conflict (duplicate entry)
+    - `500` - Internal Server Error
+    - `503` - Service Unavailable
+    
+  version: 1.0.0
+  contact:
+    name: Pi Docs API Support
+    url: https://github.com/yourusername/pi-docs
+    email: support@yourdomain.com
+  license:
+    name: ISC
+    url: https://opensource.org/licenses/ISC
+
+servers:
+  - url: https://api.yourdomain.com/api
+    description: Production server
+  - url: http://localhost:3001/api
+    description: Development server (local)
+
+tags:
+  - name: Health
+    description: Health check and status endpoints
+    externalDocs:
+      description: Find out more
+      url: https://github.com/yourusername/pi-docs
+  - name: Authentication
+    description: User authentication, registration, and account management
+  - name: Users
+    description: User profile management
+  - name: Documents
+    description: Document CRUD operations and file management
+  - name: Categories
+    description: Document category management
+  - name: Settings
+    description: User preferences and settings
+  - name: Statistics
+    description: Statistics and analytics endpoints
+
+paths:
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Health check
+      description: |
+        Check if the API is running and healthy.
+        
+        This endpoint does not require authentication and can be used for:
+        - Monitoring and uptime checks
+        - Load balancer health checks
+        - Service discovery
+      operationId: getHealth
+      responses:
+        '200':
+          description: API is healthy and running
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  message:
+                    type: string
+                    example: Pi Docs API is running
+              examples:
+                success:
+                  value:
+                    status: ok
+                    message: Pi Docs API is running
+
+  /auth/register:
+    post:
+      tags:
+        - Authentication
+      summary: Register new user
+      description: |
+        Create a new user account.
+        
+        **What happens:**
+        - Creates a new user account
+        - Hashes the password securely
+        - Creates default categories (Personal IDs, Financial, Medical, Education, Insurance, Legal)
+        - Sends verification email
+        - Returns JWT token for immediate use
+        
+        **Default Categories Created:**
+        - Personal IDs
+        - Financial
+        - Medical
+        - Education
+        - Insurance
+        - Legal
+      operationId: register
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+            examples:
+              basic:
+                summary: Basic registration
+                value:
+                  email: user@example.com
+                  password: securepassword123
+                  name: John Doe
+              minimal:
+                summary: Minimal registration (name optional)
+                value:
+                  email: user@example.com
+                  password: securepassword123
+      responses:
+        '201':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+              examples:
+                success:
+                  value:
+                    token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3OCIsImlhdCI6MTUxNjIzOTAyMn0
+                    user:
+                      id: 123e4567-e89b-12d3-a456-426614174000
+                      email: user@example.com
+                      name: John Doe
+                      emailVerified: false
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                invalidEmail:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Invalid email format
+                shortPassword:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Password must be at least 8 characters
+        '409':
+          description: Email already registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                emailExists:
+                  value:
+                    error:
+                      code: EMAIL_IN_USE
+                      message: Email is already registered
+
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: Login
+      description: |
+        Authenticate with email and password to receive an access token.
+        
+        **Security Notes:**
+        - Passwords are hashed using bcrypt
+        - Invalid credentials return the same error message (doesn't reveal if email exists)
+        - Token expires after 7 days
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            examples:
+              login:
+                value:
+                  email: user@example.com
+                  password: securepassword123
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+              examples:
+                success:
+                  value:
+                    token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3OCIsImlhdCI6MTUxNjIzOTAyMn0
+                    user:
+                      id: 123e4567-e89b-12d3-a456-426614174000
+                      email: user@example.com
+                      name: John Doe
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                invalidCredentials:
+                  value:
+                    error:
+                      code: INVALID_CREDENTIALS
+                      message: Invalid email or password
+
+  /auth/me:
+    get:
+      tags:
+        - Authentication
+      summary: Get current user
+      description: Get information about the currently authenticated user
+      operationId: getMe
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: User information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+              examples:
+                success:
+                  value:
+                    user:
+                      id: 123e4567-e89b-12d3-a456-426614174000
+                      email: user@example.com
+                      name: John Doe
+                      emailVerified: true
+        '401':
+          description: Unauthorized - Invalid or missing token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                unauthorized:
+                  value:
+                    error:
+                      code: UNAUTHENTICATED
+                      message: Missing bearer token
+
+  /auth/logout:
+    post:
+      tags:
+        - Authentication
+      summary: Logout
+      description: |
+        Logout endpoint for API consistency.
+        
+        **Note:** Since JWT tokens are stateless, logout is primarily handled client-side by removing the token.
+        This endpoint exists for API consistency and potential future token blacklisting.
+      operationId: logout
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Logged out successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Logged out successfully
+
+  /auth/send-verification:
+    post:
+      tags:
+        - Authentication
+      summary: Resend verification email
+      description: Resend email verification to the authenticated user
+      operationId: sendVerification
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Verification email sent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Verification email sent
+        '400':
+          description: Email already verified
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                alreadyVerified:
+                  value:
+                    error:
+                      code: ALREADY_VERIFIED
+                      message: Email is already verified
+        '500':
+          description: Failed to send email
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/verify-email:
+    post:
+      tags:
+        - Authentication
+      summary: Verify email address
+      description: Verify email address using token from verification email
+      operationId: verifyEmail
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - token
+              properties:
+                token:
+                  type: string
+                  description: Verification token from email
+                  example: abc123def456ghi789jkl012mno345pqr678stu901vwx234yz
+            examples:
+              verify:
+                value:
+                  token: abc123def456ghi789jkl012mno345pqr678stu901vwx234yz
+      responses:
+        '200':
+          description: Email verified successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Email verified successfully
+        '400':
+          description: Invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                invalidToken:
+                  value:
+                    error:
+                      code: INVALID_TOKEN
+                      message: Invalid or expired verification token
+
+  /auth/forgot-password:
+    post:
+      tags:
+        - Authentication
+      summary: Request password reset
+      description: |
+        Request a password reset email.
+        
+        **Security:** Always returns success message (doesn't reveal if email exists)
+      operationId: forgotPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+      responses:
+        '200':
+          description: Password reset email sent (if email exists)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: If the email exists, a password reset link has been sent
+
+  /auth/reset-password:
+    post:
+      tags:
+        - Authentication
+      summary: Reset password
+      description: Reset password using token from password reset email
+      operationId: resetPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - token
+                - password
+              properties:
+                token:
+                  type: string
+                  description: Password reset token from email
+                password:
+                  type: string
+                  minLength: 8
+                  description: New password (minimum 8 characters)
+            examples:
+              reset:
+                value:
+                  token: abc123def456ghi789jkl012mno345pqr678stu901vwx234yz
+                  password: newsecurepassword123
+      responses:
+        '200':
+          description: Password reset successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Password reset successfully
+        '400':
+          description: Invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /users/me:
+    get:
+      tags:
+        - Users
+      summary: Get user profile
+      description: Get current user's profile information including email verification status
+      operationId: getUserProfile
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+              examples:
+                success:
+                  value:
+                    user:
+                      id: 123e4567-e89b-12d3-a456-426614174000
+                      email: user@example.com
+                      name: John Doe
+                      emailVerified: true
+                      createdAt: '2024-01-01T00:00:00.000Z'
+    patch:
+      tags:
+        - Users
+      summary: Update user profile
+      description: Update current user's profile information
+      operationId: updateUserProfile
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+                  description: User's display name
+                  example: Jane Doe
+            examples:
+              updateName:
+                value:
+                  name: Jane Doe
+      responses:
+        '200':
+          description: Profile updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+              examples:
+                success:
+                  value:
+                    user:
+                      id: 123e4567-e89b-12d3-a456-426614174000
+                      email: user@example.com
+                      name: Jane Doe
+                      emailVerified: true
+                      createdAt: '2024-01-01T00:00:00.000Z'
+
+  /documents:
+    get:
+      tags:
+        - Documents
+      summary: List documents
+      description: |
+        Get all documents for the authenticated user.
+        
+        **Filtering:**
+        - Use `categoryId` to filter by category
+        - Use `search` to search in title and description (case-insensitive)
+        - Results are ordered by creation date (newest first)
+      operationId: listDocuments
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: categoryId
+          in: query
+          description: Filter by category ID (UUID)
+          required: false
+          schema:
+            type: string
+            format: uuid
+          example: 123e4567-e89b-12d3-a456-426614174000
+        - name: search
+          in: query
+          description: Search term (searches in title and description)
+          required: false
+          schema:
+            type: string
+          example: passport
+      responses:
+        '200':
+          description: List of documents
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  documents:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Document'
+              examples:
+                success:
+                  value:
+                    documents:
+                      - id: 123e4567-e89b-12d3-a456-426614174000
+                        userId: user-id
+                        categoryId: category-id
+                        title: US Passport
+                        description: United States Passport
+                        status: ACTIVE
+                        issuedAt: '2020-01-01T00:00:00.000Z'
+                        expiresAt: '2030-01-01T00:00:00.000Z'
+                        fileName: passport.pdf
+                        fileMime: application/pdf
+                        fileSize: 1024000
+                        storageProvider: LOCAL
+                        storageKey: key
+                        createdAt: '2024-01-01T00:00:00.000Z'
+                        updatedAt: '2024-01-01T00:00:00.000Z'
+                empty:
+                  value:
+                    documents: []
+    post:
+      tags:
+        - Documents
+      summary: Create document
+      description: |
+        Create a new document with optional file upload.
+        
+        **File Upload:**
+        - Use `multipart/form-data` content type
+        - File is optional - documents can be created without files
+        - Supported file types: Any (PDF, images, documents, etc.)
+        - Maximum file size: 5MB (configurable)
+        
+        **Status Calculation:**
+        Status is automatically computed based on `expiresAt`:
+        - `EXPIRED`: Already expired
+        - `EXPIRING`: Expires within 30 days
+        - `ACTIVE`: Otherwise
+        
+        **Storage:**
+        File storage provider is determined by user settings (LOCAL or S3)
+      operationId: createDocument
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - title
+              properties:
+                title:
+                  type: string
+                  description: Document title
+                  example: US Passport
+                description:
+                  type: string
+                  description: Optional description
+                  example: United States Passport
+                categoryId:
+                  type: string
+                  format: uuid
+                  description: Category ID (optional)
+                  example: 123e4567-e89b-12d3-a456-426614174000
+                issuedAt:
+                  type: string
+                  format: date-time
+                  description: Issue date (ISO 8601)
+                  example: '2020-01-01T00:00:00.000Z'
+                expiresAt:
+                  type: string
+                  format: date-time
+                  description: Expiration date (ISO 8601)
+                  example: '2030-01-01T00:00:00.000Z'
+                file:
+                  type: string
+                  format: binary
+                  description: File to upload (optional)
+            examples:
+              withFile:
+                summary: Create document with file
+                value:
+                  title: US Passport
+                  description: United States Passport
+                  categoryId: 123e4567-e89b-12d3-a456-426614174000
+                  issuedAt: '2020-01-01T00:00:00.000Z'
+                  expiresAt: '2030-01-01T00:00:00.000Z'
+                  file: (binary)
+              withoutFile:
+                summary: Create document without file
+                value:
+                  title: Insurance Policy
+                  description: Health Insurance Policy
+                  categoryId: 123e4567-e89b-12d3-a456-426614174000
+      responses:
+        '201':
+          description: Document created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  document:
+                    $ref: '#/components/schemas/Document'
+              examples:
+                success:
+                  value:
+                    document:
+                      id: 123e4567-e89b-12d3-a456-426614174000
+                      userId: user-id
+                      categoryId: category-id
+                      title: US Passport
+                      description: United States Passport
+                      status: ACTIVE
+                      issuedAt: '2020-01-01T00:00:00.000Z'
+                      expiresAt: '2030-01-01T00:00:00.000Z'
+                      fileName: passport.pdf
+                      fileMime: application/pdf
+                      fileSize: 1024000
+                      storageProvider: LOCAL
+                      storageKey: key
+                      createdAt: '2024-01-01T00:00:00.000Z'
+                      updatedAt: '2024-01-01T00:00:00.000Z'
+        '400':
+          description: Validation error or invalid category
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /documents/{id}:
+    get:
+      tags:
+        - Documents
+      summary: Get document
+      description: Get a specific document by ID
+      operationId: getDocument
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Document ID (UUID)
+          schema:
+            type: string
+            format: uuid
+          example: 123e4567-e89b-12d3-a456-426614174000
+      responses:
+        '200':
+          description: Document details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  document:
+                    $ref: '#/components/schemas/Document'
+        '404':
+          description: Document not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    patch:
+      tags:
+        - Documents
+      summary: Update document
+      description: |
+        Update a document. All fields are optional.
+        
+        **Notes:**
+        - Set fields to `null` to clear optional fields
+        - Status is automatically recomputed if `expiresAt` is updated
+        - `categoryId` must be a valid category owned by the user
+      operationId: updateDocument
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateDocumentRequest'
+            examples:
+              updateTitle:
+                value:
+                  title: Updated Title
+              updateExpiration:
+                value:
+                  expiresAt: '2035-01-01T00:00:00.000Z'
+              clearCategory:
+                value:
+                  categoryId: null
+      responses:
+        '200':
+          description: Document updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  document:
+                    $ref: '#/components/schemas/Document'
+        '404':
+          description: Document not found
+        '400':
+          description: Invalid category ID
+    delete:
+      tags:
+        - Documents
+      summary: Delete document
+      description: |
+        Delete a document and its associated file.
+        
+        **Note:** Also deletes the file from storage (LOCAL or S3)
+      operationId: deleteDocument
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Document deleted successfully
+        '404':
+          description: Document not found
+
+  /documents/{id}/download:
+    get:
+      tags:
+        - Documents
+      summary: Download document file
+      description: |
+        Download the file associated with a document.
+        
+        **Response:**
+        - Content-Type: File MIME type
+        - Content-Disposition: `attachment; filename="filename"`
+        - Body: File binary data
+      operationId: downloadDocument
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: File download
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Document or file not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                notFound:
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: Document not found
+                noFile:
+                  value:
+                    error:
+                      code: NO_FILE
+                      message: No file attached
+
+  /categories:
+    get:
+      tags:
+        - Categories
+      summary: List categories
+      description: Get all categories for the authenticated user with document counts
+      operationId: listCategories
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of categories
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  categories:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Category'
+              examples:
+                success:
+                  value:
+                    categories:
+                      - id: 123e4567-e89b-12d3-a456-426614174000
+                        name: Personal IDs
+                        icon: id-card
+                        documentsCount: 5
+                      - id: 223e4567-e89b-12d3-a456-426614174001
+                        name: Financial
+                        icon: bank
+                        documentsCount: 3
+    post:
+      tags:
+        - Categories
+      summary: Create category
+      description: Create a new document category
+      operationId: createCategory
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+                  description: Category name
+                  example: Travel Documents
+                icon:
+                  type: string
+                  minLength: 1
+                  default: folder
+                  description: Icon identifier
+                  example: plane
+            examples:
+              createCategory:
+                value:
+                  name: Travel Documents
+                  icon: plane
+      responses:
+        '201':
+          description: Category created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  category:
+                    $ref: '#/components/schemas/Category'
+        '409':
+          description: Category name already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /categories/{id}:
+    patch:
+      tags:
+        - Categories
+      summary: Update category
+      description: Update a category's name or icon
+      operationId: updateCategory
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+                icon:
+                  type: string
+                  minLength: 1
+            examples:
+              updateName:
+                value:
+                  name: Updated Category Name
+              updateIcon:
+                value:
+                  icon: new-icon
+      responses:
+        '200':
+          description: Category updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  category:
+                    $ref: '#/components/schemas/Category'
+        '404':
+          description: Category not found
+    delete:
+      tags:
+        - Categories
+      summary: Delete category
+      description: |
+        Delete a category.
+        
+        **Note:** Documents in this category will have `categoryId` set to `null`
+      operationId: deleteCategory
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Category deleted successfully
+        '404':
+          description: Category not found
+
+  /settings:
+    get:
+      tags:
+        - Settings
+      summary: Get settings
+      description: |
+        Get user settings.
+        
+        **Note:** Creates default settings if they don't exist
+      operationId: getSettings
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: User settings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  settings:
+                    $ref: '#/components/schemas/Settings'
+              examples:
+                success:
+                  value:
+                    settings:
+                      id: 123e4567-e89b-12d3-a456-426614174000
+                      userId: user-id
+                      darkMode: true
+                      biometricEnabled: false
+                      autoLockMinutes: 5
+                      storageProvider: LOCAL
+                      createdAt: '2024-01-01T00:00:00.000Z'
+                      updatedAt: '2024-01-01T00:00:00.000Z'
+    patch:
+      tags:
+        - Settings
+      summary: Update settings
+      description: Update user preferences and settings
+      operationId: updateSettings
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSettingsRequest'
+            examples:
+              updateDarkMode:
+                value:
+                  darkMode: true
+              updateStorage:
+                value:
+                  storageProvider: S3
+              updateAutoLock:
+                value:
+                  autoLockMinutes: 10
+      responses:
+        '200':
+          description: Settings updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  settings:
+                    $ref: '#/components/schemas/Settings'
+
+  /stats/overview:
+    get:
+      tags:
+        - Statistics
+      summary: Get statistics overview
+      description: |
+        Get document statistics overview.
+        
+        **Statistics:**
+        - `total`: Total number of documents
+        - `active`: Documents that are not expired and not expiring soon
+        - `expiring`: Documents expiring within 30 days
+      operationId: getStatsOverview
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Statistics overview
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  overview:
+                    $ref: '#/components/schemas/StatsOverview'
+              examples:
+                success:
+                  value:
+                    overview:
+                      total: 50
+                      active: 35
+                      expiring: 10
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT Bearer Token authentication.
+        
+        Get a token by:
+        1. Registering: `POST /auth/register`
+        2. Or logging in: `POST /auth/login`
+        
+        Include the token in the Authorization header:
+        ```
+        Authorization: Bearer <your-token>
+        ```
+        
+        Token expires after 7 days.
+
+  schemas:
+    User:
+      type: object
+      description: User profile information
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique user identifier
+          example: 123e4567-e89b-12d3-a456-426614174000
+        email:
+          type: string
+          format: email
+          description: User's email address
+          example: user@example.com
+        name:
+          type: string
+          description: User's display name
+          example: John Doe
+        emailVerified:
+          type: boolean
+          description: Whether email is verified
+          example: true
+        createdAt:
+          type: string
+          format: date-time
+          description: Account creation date
+          example: '2024-01-01T00:00:00.000Z'
+      required:
+        - id
+        - email
+        - name
+        - emailVerified
+
+    Document:
+      type: object
+      description: Document information
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: 123e4567-e89b-12d3-a456-426614174000
+        userId:
+          type: string
+          format: uuid
+          description: Owner's user ID
+        categoryId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Category ID (null if uncategorized)
+        title:
+          type: string
+          description: Document title
+          example: US Passport
+        description:
+          type: string
+          nullable: true
+          description: Optional description
+          example: United States Passport
+        status:
+          type: string
+          enum:
+            - ACTIVE
+            - EXPIRING
+            - EXPIRED
+          description: Document status (auto-computed based on expiration)
+          example: ACTIVE
+        issuedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Issue date
+          example: '2020-01-01T00:00:00.000Z'
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Expiration date
+          example: '2030-01-01T00:00:00.000Z'
+        fileName:
+          type: string
+          nullable: true
+          description: Original filename
+          example: passport.pdf
+        fileMime:
+          type: string
+          nullable: true
+          description: MIME type
+          example: application/pdf
+        fileSize:
+          type: integer
+          nullable: true
+          description: File size in bytes
+          example: 1024000
+        storageProvider:
+          type: string
+          enum:
+            - LOCAL
+            - S3
+          description: Storage provider
+          example: LOCAL
+        storageKey:
+          type: string
+          nullable: true
+          description: Storage key for file retrieval
+        createdAt:
+          type: string
+          format: date-time
+          description: Creation date
+          example: '2024-01-01T00:00:00.000Z'
+        updatedAt:
+          type: string
+          format: date-time
+          description: Last update date
+          example: '2024-01-01T00:00:00.000Z'
+      required:
+        - id
+        - userId
+        - title
+        - status
+        - storageProvider
+        - createdAt
+        - updatedAt
+
+    Category:
+      type: object
+      description: Document category
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: 123e4567-e89b-12d3-a456-426614174000
+        name:
+          type: string
+          description: Category name
+          example: Personal IDs
+        icon:
+          type: string
+          description: Icon identifier
+          example: id-card
+        documentsCount:
+          type: integer
+          description: Number of documents in this category
+          example: 5
+      required:
+        - id
+        - name
+        - icon
+        - documentsCount
+
+    Settings:
+      type: object
+      description: User settings and preferences
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        darkMode:
+          type: boolean
+          description: Dark mode preference
+          example: true
+        biometricEnabled:
+          type: boolean
+          description: Biometric authentication enabled
+          example: false
+        autoLockMinutes:
+          type: integer
+          minimum: 0
+          maximum: 240
+          description: Auto-lock timeout in minutes (0 = disabled)
+          example: 5
+        storageProvider:
+          type: string
+          enum:
+            - LOCAL
+            - S3
+          description: File storage provider
+          example: LOCAL
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - userId
+        - darkMode
+        - biometricEnabled
+        - autoLockMinutes
+        - storageProvider
+        - createdAt
+        - updatedAt
+
+    StatsOverview:
+      type: object
+      description: Document statistics overview
+      properties:
+        total:
+          type: integer
+          description: Total number of documents
+          example: 50
+        active:
+          type: integer
+          description: Active documents (not expired, not expiring soon)
+          example: 35
+        expiring:
+          type: integer
+          description: Documents expiring within 30 days
+          example: 10
+      required:
+        - total
+        - active
+        - expiring
+
+    RegisterRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          description: User's email address
+          example: user@example.com
+        password:
+          type: string
+          minLength: 8
+          description: Password (minimum 8 characters)
+          example: securepassword123
+        name:
+          type: string
+          minLength: 1
+          default: User
+          description: User's display name (optional)
+          example: John Doe
+
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          example: user@example.com
+        password:
+          type: string
+          example: securepassword123
+
+    AuthResponse:
+      type: object
+      description: Authentication response with token and user info
+      properties:
+        token:
+          type: string
+          description: JWT authentication token
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3OCIsImlhdCI6MTUxNjIzOTAyMn0
+        user:
+          $ref: '#/components/schemas/User'
+      required:
+        - token
+        - user
+
+    UpdateDocumentRequest:
+      type: object
+      description: Document update request (all fields optional)
+      properties:
+        title:
+          type: string
+          minLength: 1
+          description: Document title
+        description:
+          type: string
+          nullable: true
+          description: Description (set to null to clear)
+        categoryId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Category ID (set to null to uncategorize)
+        issuedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Issue date (set to null to clear)
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Expiration date (set to null to clear)
+
+    UpdateSettingsRequest:
+      type: object
+      description: Settings update request (all fields optional)
+      properties:
+        darkMode:
+          type: boolean
+          description: Enable/disable dark mode
+        biometricEnabled:
+          type: boolean
+          description: Enable/disable biometric authentication
+        autoLockMinutes:
+          type: integer
+          minimum: 0
+          maximum: 240
+          description: Auto-lock timeout in minutes
+        storageProvider:
+          type: string
+          enum:
+            - LOCAL
+            - S3
+          description: File storage provider
+
+    Error:
+      type: object
+      description: Error response
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              description: Error code
+              example: NOT_FOUND
+            message:
+              type: string
+              description: Human-readable error message
+              example: Document not found
+            details:
+              type: object
+              description: Additional error details (optional)
+          required:
+            - code
+            - message
+      required:
+        - error
+      examples:
+        notFound:
+          value:
+            error:
+              code: NOT_FOUND
+              message: Document not found
+        validationError:
+          value:
+            error:
+              code: VALIDATION_ERROR
+              message: Invalid email format
+        unauthorized:
+          value:
+            error:
+              code: UNAUTHENTICATED
+              message: Missing bearer token

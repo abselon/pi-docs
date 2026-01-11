@@ -1,0 +1,96 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum DocumentStatus {
+  ACTIVE
+  EXPIRING
+  EXPIRED
+}
+
+enum StorageProvider {
+  LOCAL
+  S3
+}
+
+model User {
+  id           String     @id @default(uuid())
+  email        String     @unique
+  name         String
+  passwordHash String
+
+  emailVerified         Boolean   @default(false)
+  emailVerificationToken String?
+  emailVerificationExpires DateTime?
+
+  passwordResetToken String?
+  passwordResetExpires DateTime?
+
+  settings  UserSettings?
+  categories Category[]
+  documents  Document[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model UserSettings {
+  id               String  @id @default(uuid())
+  userId           String  @unique
+  darkMode         Boolean @default(true)
+  biometricEnabled Boolean @default(false)
+  autoLockMinutes  Int     @default(0)
+  storageProvider  StorageProvider @default(LOCAL)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Category {
+  id     String @id @default(uuid())
+  userId String
+
+  name String
+  icon String
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  documents Document[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, name])
+}
+
+model Document {
+  id         String  @id @default(uuid())
+  userId     String
+  categoryId String?
+
+  title       String
+  description String?
+
+  status    DocumentStatus @default(ACTIVE)
+  issuedAt  DateTime?
+  expiresAt DateTime?
+
+  fileName String?
+  fileMime String?
+  fileSize Int?
+  storageProvider StorageProvider @default(LOCAL)
+  storageKey      String?
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+

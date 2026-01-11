@@ -1,0 +1,23 @@
+# Project Context
+
+This project is **Pi Docs** - a web application with an API backend.
+
+## Project Overview
+- **Project Name**: Pi Docs
+- **Type**: Web application with API backend
+- **Database**: PostgreSQL
+- **API Framework**: Node.js (Express)
+- **Web Framework**: Next.js (static export)
+
+## Architecture
+- **Frontend**: Next.js application in `apps/web/`
+- **Backend**: Node.js Express API in `apps/api/`
+- **Database**: PostgreSQL
+- **Testing**: Shared testing utilities in `apps/testing/`
+- **Infrastructure**: AWS CDK in `infrastructure/`
+
+## Development Guidelines
+- Use TypeScript for all code
+- Follow Next.js best practices for static export
+- API should follow RESTful conventions
+- Database migrations and schema management should be documented
