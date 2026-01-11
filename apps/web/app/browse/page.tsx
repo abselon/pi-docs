@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Screen } from '@/components/Screen';
@@ -49,7 +49,7 @@ function isImageFile(mimeType: string | null): boolean {
   return mimeType.startsWith('image/');
 }
 
-export default function BrowsePage() {
+function BrowseContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const categoryId = searchParams.get('categoryId');
@@ -492,6 +492,21 @@ export default function BrowsePage() {
         ))}
       </div>
     </Screen>
+  );
+}
+
+export default function BrowsePage() {
+  return (
+    <Suspense fallback={
+      <Screen
+        title="Browse"
+        subtitle="Loading..."
+      >
+        <div className="text-center py-8 text-white/60">Loading...</div>
+      </Screen>
+    }>
+      <BrowseContent />
+    </Suspense>
   );
 }
 
