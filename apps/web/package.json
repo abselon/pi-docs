@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "node scripts/serve.js",
+    "serve:static": "npx serve out -p 3000 -c ../serve.json",
     "lint": "eslint"
   },
   "dependencies": {

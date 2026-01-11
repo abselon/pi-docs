@@ -8,7 +8,6 @@ import DocumentPreviewClient from './DocumentPreviewClient';
 export function generateStaticParams() {
   // Generate placeholder routes to satisfy static export requirements
   // In production build, only these routes will be generated.
-  // In dev mode, Next.js will handle dynamic routes normally.
   // The client component reads the actual document ID from window.location.pathname
   return [
     { slug: ['index'] },

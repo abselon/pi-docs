@@ -13,7 +13,10 @@ type ApiError = {
 export function apiBaseUrl() {
   const url = process.env.NEXT_PUBLIC_API_BASE_URL;
   if (!url) throw new Error('NEXT_PUBLIC_API_BASE_URL is not set (see apps/web/env.example)');
-  return url.replace(/\/+$/, '');
+  const normalized = url.replace(/\/+$/, '');
+  // Backend mounts all routes under /api. Make this tolerant of misconfiguration
+  // so values like "http://localhost:3001" still work.
+  return normalized.endsWith('/api') ? normalized : `${normalized}/api`;
 }
 
 export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
