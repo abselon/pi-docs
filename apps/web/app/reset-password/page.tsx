@@ -1,13 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Screen } from '@/components/Screen';
 import { SurfaceCard, Button } from '@/components/ui';
 import { resetPassword } from '@/lib/api';
 
-export default function ResetPasswordPage() {
+function ResetPasswordContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
@@ -123,5 +123,19 @@ export default function ResetPasswordPage() {
         )}
       </SurfaceCard>
     </Screen>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={
+      <Screen title="Reset Password" subtitle="Loading...">
+        <SurfaceCard className="p-6">
+          <div className="text-center py-8 text-white/60">Loading...</div>
+        </SurfaceCard>
+      </Screen>
+    }>
+      <ResetPasswordContent />
+    </Suspense>
   );
 }

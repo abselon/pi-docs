@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Screen } from '@/components/Screen';
 import { SurfaceCard, Button } from '@/components/ui';
 import { verifyEmail } from '@/lib/api';
 
-export default function VerifyEmailPage() {
+function VerifyEmailContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
@@ -70,5 +70,19 @@ export default function VerifyEmailPage() {
         )}
       </SurfaceCard>
     </Screen>
+  );
+}
+
+export default function VerifyEmailPage() {
+  return (
+    <Suspense fallback={
+      <Screen title="Verify Email" subtitle="Loading...">
+        <SurfaceCard className="p-6">
+          <div className="text-center py-8 text-white/60">Loading...</div>
+        </SurfaceCard>
+      </Screen>
+    }>
+      <VerifyEmailContent />
+    </Suspense>
   );
 }
